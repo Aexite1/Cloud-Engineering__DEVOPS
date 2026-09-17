@@ -75,7 +75,7 @@ The web servers use shared application storage through NFS, while Apache on the 
 
 **Great Ojuolape**
 
-Computer Science Student | DevOps Learner
+Computer Science Student | DevOps & Cloud Engineering Aspirant
 
 ## License
 
