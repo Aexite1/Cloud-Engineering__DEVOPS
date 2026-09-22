@@ -1,4 +1,4 @@
-# Apache Load Balancer Configuration for the Tooling Website
+# Apache Load Balancer Configuration for a Test Website
 
 A load balancer receives client requests and distributes them across the available web servers so that traffic is shared instead of being handled by a single server.
 
@@ -12,8 +12,8 @@ Deploy Apache as a load balancer on a separate Ubuntu EC2 instance and configure
 
 The following infrastructure should already be provisioned and configured before starting the load balancer setup.
 
-- Two RHEL9 Web Servers
-- One RHEL9 NFS Server
+- Two RHEL10 Web Servers
+- One RHEL10 NFS Server
 
 ## Requirements Before Configuration Configurations
 
@@ -39,7 +39,7 @@ __2.__ __Set up Logical Volume Management on the storage server__
   - Mount lv-apps on /mnt/apps - Used by the web servers
   - Mount lv-logs on /mnt/logs - Used for web server logs
 
-#### Create 3 volumes in the same AZ as the NFS Server ec2 each of 10GB and attache all 3 volumes one by one to the NFS Server.
+#### Create volumes in the same AZ as the NFS Server ec2 each of 5GB and attach all 2 volumes one by one to the NFS Server.
 
 ![Attached NFS volumes](<./images/Screenshot 2026-08-31 125912.png>)
 
@@ -50,7 +50,7 @@ ssh -i "ec2key.pem" ec2-user@13.49.67.185
 ```
 ![NFS server SSH connection](<./images/Screenshot 2026-09-10 145936.png>)
 
-#### Run `lsblk` to identify the block devices attached to the instance. All devices in Linux reside in /dev/ directory. Inspect with ```ls /dev/``` and ensure all 3 newly created devices are there. Their name will likely be ```nvme1n1```, ```nvme2n1``` 
+#### Run `lsblk` to identify the block devices attached to the instance. All devices in Linux reside in /dev/ directory. Inspect with ```ls /dev/``` and ensure all 2 newly created devices are there. Their name will likely be ```nvme1n1```, ```nvme2n1``` 
 
 ```bash
 lsblk
@@ -142,7 +142,7 @@ sudo systemctl status nfs-server.service
 ```
 
 
-__4.__ __Make the NFS exports available to the Web Server subnet using its IPv4 CIDR range. For simplicity, all 3 Web Servers are installed in the same subnet but in production set up, each tier should be separated inside its own subnet or higher level of security__
+__4.__ __Make the NFS exports available to the Web Server subnet using its IPv4 CIDR range. For simplicity, all 2 Web Servers are installed in the same subnet but in production set up, each tier should be separated inside its own subnet or higher level of security__
 
 #### Set ownership and permissions on the shared NFS directories so the web servers can access the files.
 
@@ -347,7 +347,7 @@ sudo setsebool -P httpd_execmem 1
 
 
 __6.__ __Confirm that the application files are visible under ```/var/www``` on the web servers and under ```/mnt/apps``` on the NFS server. Matching files confirm that the NFS mount is working correctly.__
-A ```index.hmtl``` file was created on Web Server 1 and then verified from Web Servers 2 and 3.
+A ```index.hmtl``` file was created on Web Server 1 and then verified from Web Servers 2.
 
 ![create file](<./images/Screenshot 2026-09-11 161659.png>)
 ![create file](<./images/Screenshot 2026-09-11 161616.png>)
@@ -373,22 +373,6 @@ __Note__:
 Acces the website on a browser
 
 - Ensure TCP port 80 is open on the Web Server.
-- If ```403 Error``` occur, check permissions to the ```/var/www/html``` folder and also disable ```SELinux```
-
-![SELinux configuration](<./images/Screenshot 2026-09-11 163927.png>)
-
-```bash
-sudo setenforce 0
-```
-To make the change permanent, open selinux file and set selinux to disable.
-
-```bash
-sudo vi /etc/sysconfig/selinux
-
-SELINUX=disabled
-
-sudo systemctl restart httpd
-```
 
 
 
@@ -410,7 +394,7 @@ sudo systemctl restart httpd
 - Access the instance
 
 ```bash
-ssh -i "ec2key.pem" ec2-user@100.56.229.233
+ssh -i "ec2key.pem" ubuntu@100.56.229.233
 ```
 
 - Update and upgrade Ubuntu
@@ -467,7 +451,7 @@ sudo vi /etc/apache2/sites-available/000-default.conf
 ### B. Add the Load-Balancer Configuration Inside the Virtual Host
 
 ```apache
-<Proxy “balancer://mycluster”>
+<Proxy balancer://mycluster>
             BalancerMember http://172.31.29.123:80 loadfactor=5 timeout=1
            BalancerMember http://172.31.23.7:80 loadfactor=5 timeout=1
            ProxySet lbmethod=bytraffic
@@ -488,7 +472,7 @@ sudo systemctl restart apache2
 ```
 ![Restart apache](<./images/Screenshot 2026-09-11 172138.png>)
 
-```bytraffic``` balancing method with distribute incoming load between the Web Servers according to currentraffic load. The proportion in which traffic must be distributed can be controlled bt ```loadfactor``` parameter.
+The bytraffic balancing method distributes incoming load between web servers according to the volume of network traffic they process. The proportion in which traffic is distributed is controlled by the loadfactor parameter.
 
 Other methods such as ```bybusyness```, ```byrequests```, ```heartbeat``` can also be adopted.
 
@@ -582,5 +566,23 @@ These names are defined only on the load balancer. Other servers and Internet cl
 
 ### Summary
 
-Apache's ```mod_proxy_balancer``` provides several mechanisms for distributing application traffic, including different balancing algorithms and options such as sticky sessions and health checks. With the backend servers correctly configured, the load balancer provides a central entry point while allowing requests to be handled across multiple web servers.
+Apache's ```mod_proxy_balancer``` provides several mechanisms for distributing application traffic, including different balancing algorithms and options such as sticky sessions and health checks. With the backend servers correctly configured, the load balancer provides a central entry point while allowing requests to be handled across multiple web server.
+
+ __SECURITY NOTE__
+
+* The Core Risk: Combining chmod 777, broad NFS network exposure, and no_root_squash breaks defense-in-depth boundaries. Together, they create a high-severity vulnerability that allows a remote attacker to gain full host root control.
+* Vulnerability Breakdown:
+* chmod 777: Grants read/write/execute rights to all local users. Any compromised low-privilege service can alter files or run malicious code.
+   * Broad NFS Access (e.g., *): Exports shares to wide subnets. Anyone on the network can mount the share without authentication.
+   * no_root_squash: Trusts the client's root identity (UID 0) instead of downgrading it to nobody. Anyone who is root on a client machine becomes root on the shared files.
+* The Attack Chain (Host Takeover):
+1. Mount: Attacker mounts the broadly exposed NFS share from their own machine.
+   2. Inject: Being root on their own machine (no_root_squash), they write a malicious binary to the share and set the SUID bit.
+   3. Escalate: Because permissions are open (777), any local low-privilege account on the target server can execute that binary, instantly dropping the attacker into a host root shell.
+* RIGHT APLLICATIONS:
+* Restrict Files: Replace 777 with 755 for directories and 644 for files. Use chown for explicit ownership.
+   * Lock Network: Limit /etc/exports strictly to explicit, trusted target IPs.
+   * Enforce Squash: Keep root_squash enabled (system default) to strip remote administrative rights.
+
+
 
