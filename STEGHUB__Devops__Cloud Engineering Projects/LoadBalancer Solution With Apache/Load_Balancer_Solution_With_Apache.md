@@ -163,15 +163,15 @@ sudo systemctl restart nfs-server.service
 ```bash
 sudo vi /etc/exports
 
-/mnt/apps 172.31.0.0/16(rw,sync,no_all_squash,no_root_squash)
-/mnt/logs 172.31.0.0/16(rw,sync,no_all_squash,no_root_squash)
-/mnt/opt 172.31.0.0/16(rw,sync,no_all_squash,no_root_squash)
+/mnt/apps 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
+/mnt/logs 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
+/mnt/opt 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
 
 `We use 16 because, it offers a wider range for the instances in our subnet.`
 
 sudo exportfs -arv
 ```
-![NFS export configuration](<./images/Screenshot 2026-09-11 153336.png>)
+
 ![Exported NFS filesystems](<./images/Screenshot 2026-09-11 153429.png>)
 
 
