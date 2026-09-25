@@ -1,4 +1,4 @@
-# Apache Load Balancer Configuration for a Test Website
+# Apache Load Balancer Configuration for the Tooling Website
 
 A load balancer receives client requests and distributes them across the available web servers so that traffic is shared instead of being handled by a single server.
 
@@ -82,14 +82,14 @@ lsblk
 sudo yum install lvm2 -y
 ``` 
 
-#### Initialize the three partitions as LVM physical volumes and verify them with `pvs`
+#### Initialize the two partitions as LVM physical volumes and verify them with `pvs`
 
 ```bash
 sudo pvcreate /dev/nvme1n1p1 /dev/nvme2n1p1
 ```
 ![Physical volumes](<./images/Screenshot 2026-09-11 151544.png>)
 
-#### Create the `webdata-vg` volume group from the three physical volumes and confirm it with `vgs`
+#### Create the `vlgrp` volume group from the three physical volumes and confirm it with `vgs`
 
 ```bash
 sudo vgcreate vlgrp /dev/nvme1n1p1 /dev/nvme2n1p1
@@ -98,8 +98,8 @@ sudo vgcreate vlgrp /dev/nvme1n1p1 /dev/nvme2n1p1
 #### Create the two logical volumes and use `lvs` to verify the result
 
 ```bash
-sudo lvcreate -n lv-apps -L 4.5G webdata-vg
-sudo lvcreate -n lv-logs -L 4.5G webdata-vg
+sudo lvcreate -n lv-apps -L 4.5G vlgrp
+sudo lvcreate -n lv-logs -L 4.5G vlgrp
 
 ```
 ![Logical volumes](<./images/Screenshot 2026-09-11 151851.png>)
@@ -108,9 +108,9 @@ sudo lvcreate -n lv-logs -L 4.5G webdata-vg
 #### Format the logical volumes with XFS rather than ext4
 
 ```bash
-sudo mkfs -t xfs /dev/webdata-vg/lv-apps
-sudo mkfs -t xfs /dev/webdata-vg/lv-logs
-sudo mkfs -t xfs /dev/webdata-vg/lv-opt
+sudo mkfs -t xfs /dev/vlgrp/lv-apps
+sudo mkfs -t xfs /dev/vlgrp/lv-logs
+sudo mkfs -t xfs /dev/vlgrp/lv-opt
 ```
 
 #### Create the required mount directories under `/mnt`
@@ -121,9 +121,9 @@ sudo mkdir /mnt/logs
 sudo mkdir /mnt/opt
 ```
 ```bash
-sudo mount /dev/webdata-vg/lv-apps /mnt/apps
-sudo mount /dev/webdata-vg/lv-logs /mnt/logs
-sudo mount /dev/webdata-vg/lv-opt /mnt/opt
+sudo mount /dev/vlgrp/lv-apps /mnt/apps
+sudo mount /dev/vlgrp/lv-logs /mnt/logs
+sudo mount /dev/vlgrp/lv-opt /mnt/opt
 ```
 ![Mounted directories](<./images/Screenshot 2026-09-11 152545.png>)
 
@@ -149,11 +149,11 @@ __4.__ __Make the NFS exports available to the Web Server subnet using its IPv4 
 ```bash
 sudo chown -R nobody: /mnt/apps
 sudo chown -R nobody: /mnt/logs
-sudo chown -R nobody: /mnt/opt
 
-sudo chmod -R 777 /mnt/apps
-sudo chmod -R 777 /mnt/logs
-sudo chmod -R 777 /mnt/opt
+
+sudo chmod -R 755 /mnt/apps
+sudo chmod -R 755 /mnt/logs
+
 
 sudo systemctl restart nfs-server.service
 ```
@@ -465,7 +465,13 @@ ProxyPassReverse / balancer://mycluster/
 ```
 ![Server config](<./images/Screenshot 2026-09-11 173630.png>)
 
-### C. Apply the Configuration
+### C. Apply the Configuration and Confirm the Configuration.
+The set up can be confrimed by 
+```bash
+sudo apache2ctl configtest
+```
+If everything is correct, the terminal will return:
+```Syntax OK```
 
 ```bash
 sudo systemctl restart apache2
@@ -488,7 +494,7 @@ __Note__: If in the previous project, ```/var/log/httpd``` was mounted from the 
 
 ### B. Remove the Shared Apache Log Mount
 
-- Check if the Web Server's log directory is mounted to NSF
+- Check if the Web Server's log directory is mounted to NSF.**Why?** Web Server 1 and Web Server 2 should retain their own access logs so that you can independently demonstrate requests reaching both backend servers.
 
 ```bash
 df -h
