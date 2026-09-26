@@ -89,7 +89,7 @@ sudo pvcreate /dev/nvme1n1p1 /dev/nvme2n1p1
 ```
 ![Physical volumes](<./images/Screenshot 2026-09-11 151544.png>)
 
-#### Create the `vlgrp` volume group from the three physical volumes and confirm it with `vgs`
+#### Create the `vlgrp` volume group from the two physical volumes and confirm it with `vgs`
 
 ```bash
 sudo vgcreate vlgrp /dev/nvme1n1p1 /dev/nvme2n1p1
@@ -110,7 +110,7 @@ sudo lvcreate -n lv-logs -L 4.5G vlgrp
 ```bash
 sudo mkfs -t xfs /dev/vlgrp/lv-apps
 sudo mkfs -t xfs /dev/vlgrp/lv-logs
-sudo mkfs -t xfs /dev/vlgrp/lv-opt
+
 ```
 
 #### Create the required mount directories under `/mnt`
@@ -118,12 +118,12 @@ sudo mkfs -t xfs /dev/vlgrp/lv-opt
 ```bash
 sudo mkdir /mnt/apps
 sudo mkdir /mnt/logs
-sudo mkdir /mnt/opt
+
 ```
 ```bash
 sudo mount /dev/vlgrp/lv-apps /mnt/apps
 sudo mount /dev/vlgrp/lv-logs /mnt/logs
-sudo mount /dev/vlgrp/lv-opt /mnt/opt
+
 ```
 ![Mounted directories](<./images/Screenshot 2026-09-11 152545.png>)
 
@@ -163,11 +163,11 @@ sudo systemctl restart nfs-server.service
 ```bash
 sudo vi /etc/exports
 
-/mnt/apps 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
-/mnt/logs 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
-/mnt/opt 172.31.0.0/16(rw,sync,no_all_squash,root_squash)
+/mnt/apps 172.31.0.0/20(rw,sync,no_all_squash,root_squash)
+/mnt/logs 172.31.0.0/20(rw,sync,no_all_squash,root_squash)
 
-`We use 16 because, it offers a wider range for the instances in our subnet.`
+
+We use a /20 subnet mask because our IP address (172.31.25.221) needs a larger network prefix than a ```/32```; a ```/20``` prefix provides a much wider range of available IP addresses for the instances in our subnet.
 
 sudo exportfs -arv
 ```
@@ -354,17 +354,8 @@ A ```index.hmtl``` file was created on Web Server 1 and then verified from Web S
 ![check test file](<./images/Screenshot 2026-09-11 161810.png>)
 ![check test file-wb1](<./images/Screenshot 2026-09-11 163557.png>) ```WEB1```
 ![check test file-wb-2](<./images/Screenshot 2026-09-11 163634.png>)```WEB2```
-__7.__ __Locate the log folder for Apache on the Web Servers and mount it to NFS server's export for logs. Repeat ```step 4``` to ensure the mount point persists after reboot__.
 
-```bash
-sudo vi /etc/fstab
-```
 
-Add the following line
-```bash
-172.31.25.211:/mnt/logs /var/log/httpd nfs defaults 0 0
-```
-![mount and persist logs](<./images/Screenshot 2026-09-11 162101.png>)
 
 
 ![Application deployment](<./images/Screenshot 2026-09-11 163449.png>)
@@ -498,9 +489,9 @@ __Note__: If in the previous project, ```/var/log/httpd``` was mounted from the 
 
 ```bash
 df -h
-sudo umount -f /var/log/httpd
+
 ```
-If the directory is busy, the services using it needs to be stopped first.
+If it had been mounted and the directory is states busy, the services using it needs to be stopped first.
 ```bash
 sudo systemctl stop httpd
 ```
