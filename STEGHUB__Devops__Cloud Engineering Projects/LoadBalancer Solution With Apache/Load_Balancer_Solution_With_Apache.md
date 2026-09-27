@@ -172,7 +172,7 @@ We use a /20 subnet mask because our IP address (172.31.25.221) needs a larger n
 sudo exportfs -arv
 ```
 
-![Exported NFS filesystems](<./images/Screenshot 2026-09-11 153429.png>)
+![Exported NFS filesystems](<./images/Screenshot 2026-09-11 153429v.png>)
 
 
 __5.__ __Identify the NFS ports and permit the required traffic through the security group__
