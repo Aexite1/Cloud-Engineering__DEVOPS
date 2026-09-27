@@ -167,7 +167,7 @@ sudo vi /etc/exports
 /mnt/logs 172.31.0.0/20(rw,sync,no_all_squash,root_squash)
 
 
-We use a /20 subnet mask because our IP address (172.31.25.221) needs a larger network prefix than a ```/32```; a ```/20``` prefix provides a much wider range of available IP addresses for the instances in our subnet.
+## We use a /20 subnet mask because our IP address (172.31.25.221) needs a larger network prefix than a /32; a /20 prefix provides a much wider range of available IP addresses for the instances in our subnet.
 
 sudo exportfs -arv
 ```
