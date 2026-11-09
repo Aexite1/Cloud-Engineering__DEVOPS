@@ -343,6 +343,13 @@ These files use **YAML inventory syntax**. They are not INI-style
 inventories; the file extension and the YAML structure used later in
 this project should remain consistent.
 
+At this stage, only `dev.yml` is being configured for the working
+development environment. The `staging.yml`, `uat.yml` and `prod.yml`
+files are placeholders until their environments have been provisioned
+and their real host definitions have been added. Do not describe these
+as implemented environments while their inventory files are empty or
+contain example values.
+
 ![Create the inventory and playbook
 files](<./images/Screenshot 2026-09-22 163221.png>)
 
@@ -444,36 +451,44 @@ infrastructure:
 Update `inventory/dev.yml` with the following YAML inventory. Replace
 each placeholder with the corresponding **private IP address**:
 
-``` yaml
+```yaml
 all:
   children:
     nfs:
       hosts:
-        <NFS-Server-Private-IP-Address>:
-          ansible_ssh_user: ec2-user
+        nfs-server:
+          ansible_host: <NFS_SERVER_PRIVATE_IP>
+          ansible_user: ec2-user
     webservers:
       hosts:
-        <Web-Server1-Private-IP-Address>:
-          ansible_ssh_user: ec2-user
-        <Web-Server2-Private-IP-Address>:
-          ansible_ssh_user: ec2-user
+        web-server-1:
+          ansible_host: <WEB_SERVER_1_PRIVATE_IP>
+          ansible_user: ec2-user
+        web-server-2:
+          ansible_host: <WEB_SERVER_2_PRIVATE_IP>
+          ansible_user: ec2-user
     db:
       hosts:
-        <Database-Private-IP-Address>:
-          ansible_ssh_user: ubuntu
+        db-server:
+          ansible_host: <DB_SERVER_PRIVATE_IP>
+          ansible_user: ubuntu
     lb:
       hosts:
-        <Load-Balancer-Private-IP-Address>:
-          ansible_ssh_user: ubuntu
+        lb-server:
+          ansible_host: <LB_SERVER_PRIVATE_IP>
+          ansible_user: ubuntu
 ```
 
 ![Development inventory configuration](<./images/Screenshot 2026-09-23 115650.png>)
 
 The inventory groups the machines into `nfs`, `webservers`, `db` and
-`lb`. The `ansible_ssh_user` variable specifies the remote login account
-for each host. Ansible still needs a valid SSH authentication method for
-those accounts; defining the username and private IP address alone does
-not provide credentials.
+`lb`. Each host has a stable inventory alias, while `ansible_host`
+specifies the actual private IP address Ansible should connect to.
+The `ansible_user` variable specifies the remote login account.
+
+The inventory alone does not provide SSH credentials or network access.
+The controller still needs a valid authentication method and permitted
+network connectivity.
 
 ## Step 5 -- Create a Common Playbook
 
@@ -530,19 +545,24 @@ It connects as `ubuntu`, escalates privileges, refreshes the APT package
 index, and then ensures that the Wireshark package is at the latest
 version available through APT.
 
-Wireshark is retained here because it is the package used in the
-original project exercise. On a headless server, its graphical interface
-may not be useful; this playbook demonstrates package management rather
+This playbook demonstrates package management rather
 than configuring a graphical packet-analysis workstation. The package's
 availability can also depend on the enabled repositories and the
 operating-system release.
 
 The `state: latest` setting allows Ansible to install the package if it
 is absent and upgrade it when a newer repository version is available.
-This is useful for demonstrating state management, but it also means a
-later playbook run may upgrade the package. For environments that
-require tightly controlled versions, pinning a package version may be
-more appropriate.
+This is useful when the intention is to keep the package updated, but
+a later playbook run may upgrade it.
+
+If the requirement is only to ensure that the package is installed,
+consider `state: present`. This does not ask Ansible to upgrade an
+already-installed package to the newest repository version. Where
+reproducible builds or controlled change windows are required, consider
+pinning an approved package version and ensuring that version is
+available in the configured repositories. Choose the state according
+to the project's update policy; do not change it solely to force a
+second run to report `changed=0`.
 
 The playbook can be extended with other configuration tasks, for
 example:
@@ -562,14 +582,15 @@ The inventory and playbook files now exist in the local repository. The
 next step is to push the changes to GitHub so that they can be reviewed
 and merged into the `main` branch.
 
-In a team environment, changes are commonly reviewed before they are
-merged into the shared branch. This practice is sometimes called the
-**four-eyes principle**: another person reviews the work before it
-becomes part of the main codebase.
+In a team environment, changes are commonly proposed through a
+Pull Request (PR) before they are merged into the shared branch. A PR
+provides a place to inspect proposed changes and discuss them.
 
-The feature branch created earlier provides an isolated place for this
-work. Once the changes are pushed, a Pull Request (PR) can be opened so
-that another developer can review them.
+The **four-eyes principle** requires an independent person to review
+the change before it is approved or merged. Opening a PR or merging
+your own PR does not, by itself, demonstrate that an independent review
+took place. Describe this as a PR/merge workflow unless another person
+actually reviewed the changes.
 
 ### 1. Commit and push the changes
 
@@ -601,9 +622,11 @@ On GitHub, open a Pull Request from `feature/prj-11-ansible-config` into
 
 ### 3. Review the proposed changes
 
-Review the changes as another developer would. Check the playbook,
-inventory and other files for mistakes before approving the Pull
-Request.
+Inspect the diff and check the playbook, inventory and other files for
+mistakes. If another developer is available, request an independent
+review and record their approval before merging. If you are the only
+person reviewing the work, describe this as a self-review or PR/merge
+workflow; do not claim that the four-eyes principle was completed.
 
 ![Review the Pull Request](<./images/Screenshot 2026-09-23 120620.png>)
 
@@ -739,6 +762,140 @@ architecture includes the Ansible-managed configuration workflow.
 
 ![Final Ansible architecture](<./images/architecture3.png>)
 
+## Step 8 -- Validate the Committed Ansible Configuration
+
+The successful execution shown earlier is useful evidence, but the
+configuration should also be checked from the version committed to
+GitHub. These checks help confirm that the repository, Ansible
+controller and managed hosts are using the intended configuration.
+
+### 1. Confirm that the development inventory and playbook are committed
+
+On the development machine, check the repository status:
+
+```bash
+git status
+```
+
+Stage and commit the exact inventory and playbook files used for the
+successful run. Adjust the paths if your repository uses a different
+directory structure:
+
+```bash
+git add inventory/dev.yml playbooks/common.yml
+git commit -m "Update development inventory and common playbook"
+git push origin main
+```
+
+If the files are being developed on a feature branch, push that branch
+and follow the repository's PR/merge process instead. Do not claim an
+independent review unless another person actually performed one.
+
+### 2. Synchronise the Jenkins-Ansible controller with GitHub
+
+On the Jenkins-Ansible controller, change to the repository directory:
+
+```bash
+cd ~/ansible-config-mgt
+git status
+git branch --show-current
+```
+
+Retrieve the committed version from the intended branch:
+
+```bash
+git pull origin main
+git status
+git log -1 --oneline
+```
+
+The controller should be on the intended branch and contain the commit
+that includes the inventory and playbook used for validation. Resolve
+local changes before pulling; do not overwrite work unintentionally.
+
+### 3. Check the playbook syntax
+
+Run Ansible's syntax check against the final playbook and inventory:
+
+```bash
+ansible-playbook -i inventory/dev.yml playbooks/common.yml --syntax-check
+```
+
+A successful syntax check indicates that Ansible can parse the
+playbook. It does not prove that the hosts are reachable, that the IP
+addresses are correct, or that every task will succeed during execution.
+
+### 4. Run Ansible Lint
+
+If `ansible-lint` is installed, run it against the playbook:
+
+```bash
+ansible-lint playbooks/common.yml
+```
+
+Review the findings and address meaningful issues. Some findings may
+depend on the project's Ansible version, operating system or chosen
+configuration. Do not ignore a finding without understanding why it
+does not apply.
+
+### 5. Run the playbook twice without changing the configuration
+
+First, execute the playbook using the committed inventory and playbook:
+
+```bash
+ansible-playbook -i inventory/dev.yml playbooks/common.yml
+```
+
+After it completes, run the exact same command again without editing
+the inventory, playbook or managed configuration in between:
+
+```bash
+ansible-playbook -i inventory/dev.yml playbooks/common.yml
+```
+
+On the second run, inspect the `changed`, `failed` and `unreachable`
+counts for each host. A second run with `changed=0`, `failed=0` and
+`unreachable=0` on the relevant hosts is evidence that the tasks did
+not need to make further changes during that run.
+
+Not every Ansible task is automatically idempotent. Shell or command
+tasks may report changes on every run unless they are designed with
+appropriate checks and conditions. Investigate unexpected changes
+rather than presenting an unsuccessful run as successful.
+
+
+### 6. Verify private addressing and SSH restrictions
+
+Where the architecture requires a jump server, keep the managed
+application servers in private subnets. Confirm that the `ansible_host`
+values in `inventory/dev.yml` match the private IPv4 addresses of the
+corresponding EC2 instances.
+
+At the AWS Security Group level, restrict inbound SSH (TCP port 22)
+on private managed servers to the Jenkins-Ansible security group, or
+another narrowly defined trusted source required by the architecture.
+Avoid allowing SSH from `0.0.0.0/0` on application servers.
+
+From the Jenkins-Ansible controller, test Ansible connectivity:
+
+```bash
+ansible -i inventory/dev.yml all -m ansible.builtin.ping
+```
+
+The Ansible `ping` module checks Ansible connectivity and remote
+Python availability; it is not an ICMP network ping. A successful
+result helps confirm that Ansible can authenticate to the managed
+hosts, but the AWS Security Group rules and inventory addresses
+should still be checked independently.
+
+### 7. Keep portfolio evidence safe and accurate
+
+Before publishing the repository or screenshots, review them for
+unnecessary public infrastructure details, credentials, tokens,
+private keys and other sensitive configuration. Replace values that
+are not needed to explain the implementation with descriptive
+placeholders.
+
 ## Optional -- Repeat the Workflow
 
 Add another task to the Ansible playbook and repeat the development and
@@ -765,7 +922,13 @@ infrastructure.
 
 ## Technical notes and limitations
 
--   The playbook shows that the RHEL-based hosts use DNF and that the
+-   The syntax check, lint run, controller/GitHub synchronisation,
+    private-host connectivity test and two-run idempotency test must be
+    performed against the final committed files. Do not report them as
+    successful until their actual outputs have been reviewed.
+-   The Staging, UAT and Production inventories are placeholders until
+    they contain real host definitions for provisioned environments.
+-   The playbook assumes that the RHEL-based hosts use DNF and that the
     Ubuntu hosts use APT. The package must be available in the
     repositories configured on each host.
 -   The inventory uses private IP addresses and assumes that the
