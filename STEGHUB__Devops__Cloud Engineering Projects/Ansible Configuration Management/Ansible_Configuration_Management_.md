@@ -459,6 +459,7 @@ all:
         nfs-server:
           ansible_host: <NFS_SERVER_PRIVATE_IP>
           ansible_user: ec2-user
+
     webservers:
       hosts:
         web-server-1:
@@ -467,11 +468,13 @@ all:
         web-server-2:
           ansible_host: <WEB_SERVER_2_PRIVATE_IP>
           ansible_user: ec2-user
+
     db:
       hosts:
         db-server:
           ansible_host: <DB_SERVER_PRIVATE_IP>
           ansible_user: ubuntu
+
     lb:
       hosts:
         lb-server:
@@ -500,31 +503,30 @@ Open `playbooks/common.yml` and add the following configuration:
 
 ``` yaml
 ---
-- name: Update web and NFS servers
-  hosts: webservers, nfs
+---
+- name: Ensure Wireshark is installed on the RHEL-based servers
+  hosts: webservers,nfs
   remote_user: ec2-user
   become: true
-  become_user: root
   tasks:
-    - name: Ensure wireshark is at the latest version
-      dnf:
+    - name: Install Wireshark
+      ansible.builtin.dnf:
         name: wireshark
-        state: latest
+        state: present
 
-- name: Update LB and DB servers
-  hosts: lb, db
+- name: Ensure Wireshark is installed on the Ubuntu servers
+  hosts: lb,db
   remote_user: ubuntu
   become: true
-  become_user: root
   tasks:
-    - name: Update apt repo
-      apt:
-        update_cache: yes
+    - name: Refresh the APT package index
+      ansible.builtin.apt:
+        update_cache: true
 
-    - name: Ensure wireshark is at the latest version
-      apt:
+    - name: Install Wireshark
+      ansible.builtin.apt:
         name: wireshark
-        state: latest
+        state: present
 ```
 
 ![Common Ansible playbook in Visual Studio
@@ -535,9 +537,9 @@ Linux distributions and package managers.
 
 The first play targets the RHEL-based web and NFS servers. It connects
 as `ec2-user`, elevates privileges to root with Ansible's
-privilege-escalation mechanism, and uses the `dnf` package module to
+privilege-escalation mechanism, and uses the `ansible.builtin.dnf` package module to
 ensure that Wireshark is installed at the latest version available from
-the configured repositories. `dnf` is the appropriate Ansible package
+the configured repositories. `ansible.builtin.apt` is the appropriate Ansible package
 module for DNF-based systems such as RHEL 9.
 
 The second play targets the Ubuntu load balancer and database servers.
