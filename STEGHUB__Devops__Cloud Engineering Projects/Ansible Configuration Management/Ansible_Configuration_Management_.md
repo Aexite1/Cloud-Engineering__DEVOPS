@@ -889,14 +889,6 @@ result helps confirm that Ansible can authenticate to the managed
 hosts, but the AWS Security Group rules and inventory addresses
 should still be checked independently.
 
-### 7. Keep portfolio evidence safe and accurate
-
-Before publishing the repository or screenshots, review them for
-unnecessary public infrastructure details, credentials, tokens,
-private keys and other sensitive configuration. Replace values that
-are not needed to explain the implementation with descriptive
-placeholders.
-
 ## Optional -- Repeat the Workflow
 
 Add another task to the Ansible playbook and repeat the development and
