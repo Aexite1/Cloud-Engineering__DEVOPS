@@ -503,7 +503,6 @@ Open `playbooks/common.yml` and add the following configuration:
 
 ``` yaml
 ---
----
 - name: Ensure Wireshark is installed on the RHEL-based servers
   hosts: webservers,nfs
   remote_user: ec2-user
