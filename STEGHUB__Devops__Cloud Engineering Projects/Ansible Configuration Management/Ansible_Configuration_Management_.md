@@ -538,7 +538,7 @@ The first play targets the RHEL-based web and NFS servers. It connects
 as `ec2-user`, elevates privileges to root with Ansible's
 privilege-escalation mechanism, and uses the `ansible.builtin.dnf` package module to
 ensure that Wireshark is installed at the latest version available from
-the configured repositories. `ansible.builtin.apt` is the appropriate Ansible package
+the configured repositories. `ansible.builtin.dnf` is the appropriate Ansible package
 module for DNF-based systems such as RHEL 9.
 
 The second play targets the Ubuntu load balancer and database servers.
